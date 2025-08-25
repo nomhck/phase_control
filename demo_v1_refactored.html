@@ -1,0 +1,229 @@
+<!DOCTYPE html><!-- ドキュメント種別を宣言する行 --> 
+<html lang="ja"><!-- ページの言語を日本語に設定 --> 
+<head><!-- ヘッダー開始（メタ情報等） --> 
+<meta charset="utf-8" /><!-- 文字エンコーディングをUTF-8に指定 --> 
+<meta name="viewport" content="width=device-width,initial-scale=1" /><!-- レスポンシブ対応のビューポート --> 
+<title>EPC Relation & Phase Control — Neon Glass Mock</title><!-- ページタイトル --> 
+
+<style><!-- スタイル開始（簡略化したガラス / ネオン風スタイル） --> 
+:root{ /* ルート変数定義 */ --bg:#07101a; /* 背景色 */ } /* 色変数の開始と簡略化 */ 
+*{box-sizing:border-box;font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Noto Sans JP,sans-serif;} /* ベースフォントとボックスモデル */ 
+body{margin:0;color:#e7edf7;background:linear-gradient(180deg,#07101a,#0f1724);} /* 背景グラデと文字色 */ 
+header{padding:12px 16px;border-bottom:1px solid rgba(20,34,56,.6);display:flex;align-items:center;gap:12px;} /* ヘッダーのレイアウト */ 
+header h1{margin:0;font-size:15px;font-weight:800;background:linear-gradient(90deg,#93c5fd,#c084fc);-webkit-background-clip:text;background-clip:text;color:transparent;} /* 見出しのグラデテキスト */ 
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;background:rgba(11,16,33,.85);border:1px solid #16243a;} /* 小さなラベル */ 
+.container{display:grid;grid-template-columns:420px 1fr;gap:12px;padding:12px;} /* 左右の2カラムレイアウト */ 
+.panel{background:rgba(11,18,32,.65);border:1px solid #13243a;border-radius:12px;padding:12px;backdrop-filter:blur(8px);} /* パネル共通 */ 
+.kpi-table{width:100%;border-collapse:collapse;font-size:13px;} /* KPIテーブル */ 
+.kpi-table th,.kpi-table td{padding:6px 6px;border-bottom:1px solid rgba(18,32,58,.6);} /* テーブル行 */ 
+.flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap;} /* 汎用フレックス */ 
+.btn{background:#0e1630;border:1px solid #22335c;color:#e5edff;padding:8px 10px;border-radius:8px;cursor:pointer;} /* ボタン */ 
+.small{font-size:12px;color:#9fb3ce;} /* 小さい説明 */ 
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;} /* 等幅フォント */ 
+#pcCanvas,#graphCanvas{width:100%;height:360px;border-radius:10px;background:linear-gradient(180deg,#060a14,#07101a);display:block;border:1px solid rgba(18,32,58,.6);} /* SVGキャンバス */ 
+.tooltip{position:fixed;pointer-events:none;z-index:1000;padding:8px 10px;border-radius:8px;background:rgba(11,16,33,.92);border:1px solid #22335c;color:#e6eefc;opacity:0;transform:translate(-50%,-120%);transition:opacity .12s,transform .12s;} /* ツールチップ */ 
+.tooltip.show{opacity:1;transform:translate(-50%,-140%);} /* ツールチップ表示 */ 
+</style><!-- スタイル終了 --> 
+</head><!-- ヘッダー終了 --> 
+<body><!-- ボディ開始 --> 
+
+<header><!-- ヘッダーコンテンツ開始 --> 
+  <h1>EPC｜IN-OUT Relation → Phase Control（M） Mock — Neon Glass</h1><!-- タイトルテキスト --> 
+  <span class="pill">ネオングラデ & ガラス</span><!-- 補助ラベル --> 
+  <span class="pill">FS/SS/FF/SF ＋ Lag</span><!-- 補助ラベル --> 
+  <span class="pill">ドラッグ / ツールチップ / PNG出力</span><!-- 補助ラベル --> 
+</header><!-- ヘッダーコンテンツ終了 --> 
+
+<div class="container"><!-- メインコンテナ開始 --> 
+
+  <div class="panel"><!-- 左サイドパネル開始 --> 
+    <h2 class="small">KPI Milestone Summary（Target/Actual）</h2><!-- 小さな見出し --> 
+    <table class="kpi-table" id="kpiTable"><!-- KPIテーブル --> 
+      <thead><!-- テーブルヘッダ --> 
+        <tr><!-- ヘッダ行 --> 
+          <th style="width:26px;">ID</th><!-- 列：ID --> 
+          <th>Milestone</th><!-- 列：名称 --> 
+          <th>Phase</th><!-- 列：フェーズ --> 
+          <th style="width:104px;">Target M</th><!-- 列：Target --> 
+          <th style="width:104px;">Actual M</th><!-- 列：Actual --> 
+          <th style="width:84px;">Status</th><!-- 列：状態 --> 
+        </tr><!-- ヘッダ行終了 --> 
+      </thead><!-- テーブルヘッダ終了 --> 
+      <tbody></tbody><!-- テーブルボディ（動的に埋める） --> 
+    </table><!-- KPIテーブル終了 --> 
+
+    <div style="height:12px;"></div><!-- 隙間 --> 
+
+    <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><!-- リンクと出力領域を2分割 --> 
+
+      <div><!-- リンク編集ブロック --> 
+        <h2 class="small">Links（依存関係）</h2><!-- 見出し --> 
+        <div class="flex"><!-- 選択肢 --> 
+          <select id="predSel"></select><!-- 先行ノード選択 --> 
+          <select id="succSel"></select><!-- 従属ノード選択 --> 
+        </div><!-- 選択肢終了 --> 
+
+        <div class="flex" style="margin-top:6px;"><!-- 種類と遅延 --> 
+          <select id="typeSel"><option>FS</option><option>SS</option><option>FF</option><option>SF</option></select><!-- リンク種別 --> 
+          <input id="lagInput" type="number" step="0.1" value="0" style="width:80px;" /><!-- ラグ入力 --> 
+          <span class="small">Lag（M）負で前倒し</span><!-- 説明 --> 
+        </div><!-- 種類と遅延終了 --> 
+
+        <div class="flex" style="margin-top:8px;"><!-- アクションボタン --> 
+          <button class="btn" id="addLinkBtn">＋ リンク追加</button><!-- 追加ボタン --> 
+          <button class="btn" id="toggleViolBtn">違反のみ表示/解除</button><!-- フィルタ切替 --> 
+        </div><!-- アクション終了 --> 
+
+        <div class="list mono" id="linksList" style="max-height:160px;overflow:auto;margin-top:8px;"></div><!-- リンク一覧 --> 
+      </div><!-- リンクブロック終了 --> 
+
+      <div><!-- 表示・出力ブロック --> 
+        <h2 class="small">表示 & 出力</h2><!-- 見出し --> 
+        <div class="small">M軸最大</div><!-- M軸の最大値ラベル --> 
+        <input type="number" id="maxM" value="12" min="3" max="60" step="1" style="width:120px;" /><!-- M軸最大値入力 --> 
+
+        <div class="small" style="margin-top:8px;">オプション</div><!-- オプション見出し --> 
+        <div class="flex" style="margin-top:6px;"><!-- オプションチェック --> 
+          <label><input type="checkbox" id="showGrid" checked /> グリッド</label><!-- グリッドON/OFF --> 
+          <label><input type="checkbox" id="colorByPhase" checked /> フェーズ色</label><!-- 色ON/OFF --> 
+          <label><input type="checkbox" id="warnTight" /> 余裕ゼロ警告</label><!-- 余裕ゼロ警告 --> 
+        </div><!-- オプション終了 --> 
+
+        <div class="small" style="margin-top:8px;">エクスポート</div><!-- エクスポート見出し --> 
+        <div class="flex" style="margin-top:6px;"><!-- エクスポートボタン --> 
+          <button class="btn" id="exportJsonBtn">JSON出力</button><!-- JSON出力 --> 
+          <button class="btn" id="exportPngBtn">PC図PNG</button><!-- PNG出力 --> 
+        </div><!-- エクスポート終了 --> 
+      </div><!-- 表示・出力ブロック終了 --> 
+
+    </div><!-- grid2終了 --> 
+
+  </div><!-- 左パネル終了 --> 
+
+  <div class="panel"><!-- 右メインパネル開始 --> 
+    <h2 class="small">PC図（M軸）｜ターゲット/実績・制約と連動</h2><!-- 見出し --> 
+    <svg id="pcCanvas" role="img" aria-label="PC Chart"></svg><!-- PC図SVG --> 
+    <div style="height:12px;"></div><!-- 隙間 --> 
+    <h2 class="small">IN-OUT Relation（Phaseレーン＋ドラッグ可）</h2><!-- グラフ見出し --> 
+    <svg id="graphCanvas" role="img" aria-label="Relation Graph"></svg><!-- RelationグラフSVG --> 
+    <div style="height:12px;"></div><!-- 隙間 --> 
+    <h2 class="small">制約チェック（Mの不等式）</h2><!-- 制約見出し --> 
+    <div id="violations" class="small mono" style="min-height:28px;"></div><!-- 違反メッセージ表示 --> 
+  </div><!-- 右パネル終了 --> 
+
+</div><!-- コンテナ終了 --> 
+
+<div class="tooltip" id="tooltip"></div><!-- ツールチップ要素 --> 
+
+<script><!-- スクリプト開始（簡潔にリファクタリング） --> 
+// --- 初期データ --- // 初期フェーズ定義を保持する行 
+const phases = [ {id:1,name:"FEED"}, {id:2,name:"Design"}, {id:3,name:"Procurement"}, {id:4,name:"Construction"}, {id:5,name:"Commissioning"} ]; // フェーズ配列 // 
+// 初期アイテム（マイルストーン）データ 
+let items = [ {id:"ENG-001",name:"Basic Engineering Complete",phase:1,targetM:1.0,actualM:null,status:"Planned"}, {id:"ENG-005",name:"P&ID Approved (IFC)",phase:2,targetM:2.2,actualM:null,status:"Planned"}, {id:"PROC-010",name:"Procurement Kickoff",phase:3,targetM:2.0,actualM:null,status:"Planned"}, {id:"PROC-030",name:"Vendor Data Complete",phase:3,targetM:3.5,actualM:null,status:"Planned"}, {id:"CONST-010",name:"Site Mobilization",phase:4,targetM:5.0,actualM:null,status:"Planned"}, {id:"COMM-001",name:"Commissioning Start",phase:5,targetM:9.0,actualM:null,status:"Planned"} ]; // items // 
+// 初期リンク（依存関係）データ 
+let links = [ {id:"L1",pred:"ENG-001",succ:"PROC-010",type:"FS",lagM:0.0}, {id:"L2",pred:"ENG-005",succ:"PROC-030",type:"FS",lagM:-0.3}, {id:"L3",pred:"PROC-030",succ:"CONST-010",type:"FS",lagM:0.0}, {id:"L4",pred:"CONST-010",succ:"COMM-001",type:"FS",lagM:0.0} ]; // links // 
+
+// --- DOM参照 --- // 各種要素を取得する行 
+const kpiBody = document.querySelector('#kpiTable tbody'); // KPIテーブルのtbodyを参照 
+const predSel = document.getElementById('predSel'); // 先行選択要素 
+const succSel = document.getElementById('succSel'); // 従属選択要素 
+const typeSel = document.getElementById('typeSel'); // リンク種別選択 
+const lagInput = document.getElementById('lagInput'); // ラグ入力 
+const addLinkBtn = document.getElementById('addLinkBtn'); // 追加ボタン 
+const toggleViolBtn = document.getElementById('toggleViolBtn'); // 違反表示切替ボタン 
+const linksList = document.getElementById('linksList'); // リンク一覧表示領域 
+const maxMInput = document.getElementById('maxM'); // M軸最大値入力 
+const showGridChk = document.getElementById('showGrid'); // グリッドチェックボックス 
+const colorByPhaseChk = document.getElementById('colorByPhase'); // フェーズ色チェック 
+const warnTightChk = document.getElementById('warnTight'); // 余裕ゼロ警告チェック 
+const pcSvg = document.getElementById('pcCanvas'); // PC図SVG参照 
+const graphSvg = document.getElementById('graphCanvas'); // RelationグラフSVG参照 
+const violationsDiv = document.getElementById('violations'); // 違反表示領域参照 
+const exportJsonBtn = document.getElementById('exportJsonBtn'); // JSON出力ボタン 
+const exportPngBtn = document.getElementById('exportPngBtn'); // PNG出力ボタン 
+const tooltip = document.getElementById('tooltip'); // ツールチップ要素取得 
+
+// 状態フラグ等 
+let violOnly = false; // リンクリストを違反のみ表示するかのフラグ 
+let nodePosOverride = new Map(); // グラフ上でドラッグした後の位置を保持するマップ 
+
+// --- ユーティリティ --- // 汎用SVG要素生成関数 
+function svgEl(tag,attrs){ const el=document.createElementNS('http://www.w3.org/2000/svg',tag); for(const k in attrs) el.setAttribute(k,attrs[k]); return el; } // SVG作成 // 
+function svgText(str,x,y,anchor='start',cls=''){ const t=svgEl('text',{x,y,'text-anchor':anchor}); if(cls) t.setAttribute('class',cls); t.textContent=str; return t; } // SVGテキスト作成 // 
+function fmt(n){ return (Number.isFinite(n)?(Math.round(n*10)/10).toFixed(1):'—'); } // 小数1桁フォーマット // 
+
+// --- ドロップダウンとKPIテーブル描画 --- // ドロップダウンを更新する関数 
+function renderLinkSelectors(){ predSel.innerHTML = items.map(it=>`<option value="${it.id}">${it.id} ${it.name}</option>`).join(''); succSel.innerHTML = predSel.innerHTML; } // セレクタ更新 // 
+// KPIテーブルを再描画する関数（簡潔化） 
+function renderKpiTable(){ kpiBody.innerHTML=''; const sorted=[...items].sort((a,b)=>a.phase-b.phase||a.targetM-b.targetM); sorted.forEach(it=>{ const tr=document.createElement('tr'); tr.innerHTML = `<td class="mono">${it.id}</td><td>${it.name}</td><td><span class="small">${phaseName(it.phase)}</span></td><td><input type="number" step="0.1" value="${it.targetM==null?'':it.targetM}" data-id="${it.id}" data-field="targetM" /></td><td><input type="number" step="0.1" value="${it.actualM==null?'':it.actualM}" data-id="${it.id}" data-field="actualM" /></td><td>${statusBadge(it)}</td>`; kpiBody.appendChild(tr); }); // テーブル行追加 // 
+// KPI入力のイベントをバルクで登録する関数（イベントデリゲートで簡素化） 
+kpiBody.addEventListener('input',(e)=>{ const inp=e.target; if(!inp.dataset) return; const id=inp.dataset.id, field=inp.dataset.field; if(!id||!field) return; const v=inp.value===''?null:parseFloat(inp.value); const obj=items.find(x=>x.id===id); if(!obj) return; obj[field]= (v===null||Number.isNaN(v))?null:v; if(obj.actualM!=null && obj.targetM!=null) obj.status = (obj.actualM <= obj.targetM)?'Done':'Delayed'; renderAll(); }); // KPI入力反映 // 
+
+// ステータス表示文字列を返す関数 
+function statusBadge(it){ if(it.actualM==null) return `<span class="small">Planned</span>`; return (it.actualM<=it.targetM)?`<span style="color:#34d399">On / Early</span>`:`<span style="color:#fbbf24">Delayed</span>`; } // 状態バッジ // 
+function phaseName(id){ return (phases.find(p=>p.id===id)||{name:`P${id}`}).name; } // フェーズ名取得 // 
+
+// --- リンク管理 --- // リンクIDを一意に生成する関数 
+function uniqueLinkId(){ let n=links.length+1; while(links.some(l=>l.id===`L${n}`)) n++; return `L${n}`; } // 一意ID生成 // 
+// リンク一覧を描画する関数（違反フィルタ対応） 
+function renderLinksList(onlyViol=false){ linksList.innerHTML=''; const vmap=new Map(checkConstraints().map(v=>[v.linkId,v])); links.forEach(lk=>{ const viol=vmap.get(lk.id); if(onlyViol && !viol) return; const wrap=document.createElement('div'); wrap.className='flex'; const txt=document.createElement('div'); txt.className='mono'; txt.textContent=`${lk.id}: ${lk.pred} -${lk.type}(${fmt(lk.lagM)}M)-> ${lk.succ}`; const del=document.createElement('button'); del.className='btn'; del.textContent='削除'; del.onclick=()=>{ links=links.filter(x=>x.id!==lk.id); renderAll(); }; wrap.appendChild(txt); if(viol){ const badge=document.createElement('span'); badge.className='mono'; badge.style.padding='2px 6px'; badge.style.borderRadius='6px'; badge.style.marginRight='6px'; badge.style.background='#0b1021'; badge.style.color=viol.severity==='err'?'#f87171':'#fbbf24'; badge.textContent=viol.msg.replaceAll('>=','⩾'); wrap.insertBefore(badge,txt); } wrap.appendChild(del); linksList.appendChild(wrap); }); } // リンク一覧描画 // 
+// リンク追加イベント 
+addLinkBtn.addEventListener('click',()=>{ const pred=predSel.value,succ=succSel.value; if(pred===succ){ alert('同一ノードは不可です'); return; } const type=typeSel.value, lag=parseFloat(lagInput.value)||0; links.push({id:uniqueLinkId(),pred,succ,type,lagM:lag}); renderAll(); }); // 追加処理 // 
+toggleViolBtn.addEventListener('click',()=>{ violOnly=!violOnly; renderLinksList(violOnly); }); // 違反フィルタ切替 // 
+
+// --- 制約チェック（不等式） --- // リンクの不等式を検査して違反リストを返す関数 
+function checkConstraints(){ const idx=new Map(items.map(it=>[it.id,it])); const res=[]; for(const lk of links){ const P=idx.get(lk.pred), S=idx.get(lk.succ); if(!P||!S||P.targetM==null||S.targetM==null) continue; const lag = Number(lk.lagM)||0; let diff=0,msg=''; if(lk.type==='SF'){ diff = P.targetM - (S.targetM + lag); msg=`M(${P.id}) >= M(${S.id}) + ${fmt(lag)}`; } else { diff = S.targetM - (P.targetM + lag); msg=`M(${S.id}) >= M(${P.id}) + ${fmt(lag)}`; } const ok = diff >= -1e-9; let severity = ok?null:'err'; if(!severity && warnTightChk.checked && Math.abs(diff) < 1e-9) severity='warn'; if(severity) res.push({linkId:lk.id,pred:lk.pred,succ:lk.succ,msg,severity}); } return res; } // 制約チェック戻り値 // 
+
+// --- PC図描画 --- // PC図を描画する関数（単純化） 
+function renderPC(){ const w=pcSvg.clientWidth,h=pcSvg.clientHeight; pcSvg.setAttribute('viewBox',`0 0 ${w} ${h}`); pcSvg.innerHTML=''; // SVGをクリア // 
+  const defs=svgEl('defs',{}); pcSvg.appendChild(defs); // 最小限のdefs // 
+  const maxM=Math.max(parseFloat(maxMInput.value)||12,getMaxMFromData(),3); const margin={l:56,r:18,t:20,b:34}; const innerW=w-margin.l-margin.r, innerH=h-margin.t-margin.b; const g=svgEl('g',{transform:`translate(${margin.l},${margin.t})`}); pcSvg.appendChild(g); const scaleX=m=> (m/maxM)*innerW; // スケール関数 // 
+  // 軸とメモリを描く（グリッド可） 
+  if(showGridChk.checked){ for(let m=0;m<=maxM;m+=1){ const x=scaleX(m); g.appendChild(svgEl('line',{x1:x,y1:0,x2:x,y2:innerH,stroke:'#12243a', 'stroke-width': (m%5===0)?1.2:0.6})); g.appendChild(svgText(String(m),x,innerH+18,'middle','')); } } else { g.appendChild(svgEl('line',{x1:0,y1:innerH,x2:innerW,y2:innerH,stroke:'#2a4a86','stroke-width':1})); for(let m=0;m<=maxM;m+=1){ g.appendChild(svgText(String(m),scaleX(m),innerH+18,'middle','')); } } g.appendChild(svgText('M',innerW+12,innerH+18,'start','')); // 軸ラベル // 
+  // マイルストーンを行単位で描画 
+  const sorted=[...items].sort((a,b)=>a.targetM-b.targetM); const rowH=28; sorted.forEach((it,i)=>{ const y=12 + i*rowH; g.appendChild(svgEl('line',{x1:0,y1:y,x2:innerW,y2:y,stroke:'#0c1430','stroke-width':0.4})); const xT=scaleX(it.targetM||0); const circle=svgEl('circle',{cx:xT,cy:y,r:6,fill:'#38bdf8',stroke:'#1f2a44'}); bindTip(circle,`${it.id} — Target\nPhase:${phaseName(it.phase)}\nM:${fmt(it.targetM)}`); g.appendChild(circle); g.appendChild(svgText(it.id,xT+10,y+4,'start','mono')); if(it.actualM!=null){ const xA=scaleX(it.actualM); const rect=svgEl('rect',{x:xA-6,y:y-6,width:12,height:12,transform:`rotate(45 ${xA} ${y})`,fill:'#c084fc'}); bindTip(rect,`${it.id} — Actual\nActual M:${fmt(it.actualM)}\nΔ:${it.targetM!=null?fmt(it.actualM-it.targetM):'—'}`); g.appendChild(rect); } }); // マイルストーン描画終了 // 
+} // renderPC end // 
+
+// --- Relationグラフ描画（ドラッグ可） --- // グラフを描画する関数 
+function renderGraph(){ const w=graphSvg.clientWidth,h=graphSvg.clientHeight; graphSvg.setAttribute('viewBox',`0 0 ${w} ${h}`); graphSvg.innerHTML=''; const margin={l:18,r:18,t:26,b:18}; const innerW=w-margin.l-margin.r, innerH=h-margin.t-margin.b; const g=svgEl('g',{}); graphSvg.appendChild(g); const colW = innerW / phases.length; const colX = c => margin.l + (c + 0.5) * colW; // フェーズ列X座標 // 
+  // ノード配置（デフォルトはフェーズ内でターゲット順、ドラッグでoverride） 
+  const byPhase = new Map(phases.map(p=>[p.id,[]])); items.forEach(it=>{ (byPhase.get(it.phase)||[]).push(it); }); for(const arr of byPhase.values()) arr.sort((a,b)=>a.targetM-b.targetM); const nodePos = new Map(); phases.forEach((p,c)=>{ const arr=byPhase.get(p.id)||[]; for(let r=0;r<arr.length;r++){ const it=arr[r]; const defX=colX(c), defY=margin.t + (r+1)*((innerH-30)/(arr.length+1)); const ov=nodePosOverride.get(it.id); nodePos.set(it.id, ov?{x:ov.x,y:ov.y}:{x:defX,y:defY}); } g.appendChild(svgText(p.name,colX(c),16,'middle','')); }); // ノード位置確定 // 
+  // エッジ（曲線）を描画 
+  const viols = checkConstraints(); const vmap = new Map(viols.map(v=>[v.linkId,v])); links.forEach(lk=>{ const p=nodePos.get(lk.pred), s=nodePos.get(lk.succ); if(!p||!s) return; const midX=(p.x+s.x)/2; const d=`M ${p.x} ${p.y} C ${midX} ${p.y}, ${midX} ${s.y}, ${s.x} ${s.y}`; const path=svgEl('path',{d,fill:'none',stroke: vmap.get(lk.id)?'#f87171':'#7aa2ff','stroke-width':1.6}); bindTip(path,`${lk.pred} → ${lk.succ}\nType:${lk.type}\nLag:${fmt(lk.lagM)}M${vmap.get(lk.id)?'\nViolation:'+vmap.get(lk.id).msg.replaceAll('>=','⩾'):''}`); g.appendChild(path); const mx= (p.x+s.x)/2, my=(p.y+s.y)/2 - 6; g.appendChild(svgText(`${lk.type} ${fmt(lk.lagM)}M`,mx,my,'middle','mono')); }); // エッジ描画 // 
+  // ノード本体を描画（矩形ラベル、ドラッグ有効） 
+  items.forEach(it=>{ const pos=nodePos.get(it.id); if(!pos) return; const pIndex=phases.findIndex(p=>p.id===it.phase); const color = colorByPhaseChk.checked? (['#0f253f','#0f2f29','#2a1d35','#2b2414'][pIndex%4]) : '#0f1626'; const grp=svgEl('g',{cursor:'grab'}); const rect=svgEl('rect',{x:pos.x-110,y:pos.y-16,width:220,height:34,rx:8,ry:8,fill:color,stroke:'#21325a'}); const idT=svgText(it.id,pos.x-102,pos.y+4,'start','mono'); const nameT=svgText(it.name,pos.x-12,pos.y+4,'start',''); bindTip(rect,`${it.id}\n${it.name}\nPhase:${phaseName(it.phase)}\nTarget:${fmt(it.targetM)}${it.actualM!=null?`\nActual:${fmt(it.actualM)}`:''}`); grp.appendChild(rect); grp.appendChild(idT); grp.appendChild(nameT); graphSvg.appendChild(grp); enableDrag(grp,it.id,pos); }); // ノード描画終了 // 
+} // renderGraph end // 
+
+// --- ドラッグ処理 --- // ノードをドラッグ可能にする（簡易実装） 
+function enableDrag(grp,id,pos){ let dragging=false,offset={x:0,y:0}; grp.addEventListener('mousedown',(e)=>{ dragging=true; grp.style.cursor='grabbing'; const pt=svgPoint(graphSvg,e.clientX,e.clientY); offset.x = pos.x - pt.x; offset.y = pos.y - pt.y; e.preventDefault(); }); window.addEventListener('mousemove',(e)=>{ if(!dragging) return; const pt=svgPoint(graphSvg,e.clientX,e.clientY); const nx=pt.x + offset.x, ny=pt.y + offset.y; nodePosOverride.set(id,{x:nx,y:ny}); renderGraph(); }); window.addEventListener('mouseup',()=>{ if(dragging){ dragging=false; grp.style.cursor='grab'; } }); } // enableDrag // 
+// マウスポジションをSVG座標に変換するユーティリティ 
+function svgPoint(svg,x,y){ const pt=svg.createSVGPoint(); pt.x=x; pt.y=y; return pt.matrixTransform(svg.getScreenCTM().inverse()); } // svgPoint // 
+
+// --- ツールチップバインド --- // 要素にマウスで情報表示を結び付ける関数 
+function bindTip(el,text){ el.addEventListener('mousemove',(e)=>{ tooltip.textContent=''; // 一旦クリアしてからテキストを入れる 
+  tooltip.textContent = text; tooltip.style.left = `${e.clientX}px`; tooltip.style.top = `${e.clientY}px`; if(!tooltip.classList.contains('show')) tooltip.classList.add('show'); }); el.addEventListener('mouseleave',()=>{ tooltip.classList.remove('show'); }); } // bindTip // 
+
+// --- エクスポート --- // SVGをPNGとしてダウンロードする単純実装 
+function exportSvgAsPng(svgElRef,filename='pc_chart.png'){ const xml = new XMLSerializer().serializeToString(svgElRef); const img = new Image(); img.onload = ()=>{ const c=document.createElement('canvas'); c.width = svgElRef.clientWidth; c.height = svgElRef.clientHeight; const ctx=c.getContext('2d'); // 背景グラデーションを描く（簡易） 
+  const grd = ctx.createLinearGradient(0,0,0,c.height); grd.addColorStop(0,'#0a1020'); grd.addColorStop(1,'#0a0f1e'); ctx.fillStyle = grd; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(img,0,0); c.toBlob((blob)=>{ const a=document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }); }; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml); } // exportSvgAsPng // 
+
+// JSON出力ボタンイベント 
+exportJsonBtn.addEventListener('click',()=>{ const payload={phases,items,links,options:{maxM:parseFloat(maxMInput.value)||12,warnTight:!!warnTightChk.checked}}; const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='epc_mock_data.json'; a.click(); URL.revokeObjectURL(a.href); }); // JSON出力 // 
+// PNG出力ボタンイベント 
+exportPngBtn.addEventListener('click',()=>exportSvgAsPng(pcSvg,'pc_chart.png')); // PNG出力 // 
+
+// --- ヘルパー --- // データ中の最大Mを求める（Target/Actualの最大） 
+function getMaxMFromData(){ return Math.ceil(Math.max(...items.map(x=>x.targetM||0).concat(items.map(x=>x.actualM||0)))); } // getMaxMFromData // 
+
+// --- 共通描画をまとめる --- // 全てのパネル／SVGを再描画する関数 
+function renderAll(){ renderKpiTable(); renderLinkSelectors(); renderLinksList(violOnly); renderPC(); renderGraph(); const v = checkConstraints(); violationsDiv.innerHTML = v.length===0?`<span style="color:#34d399">制約違反なし</span>`: v.map(x=>`<div style="color:${x.severity==='err'?'#f87171':'#fbbf24'}" class="mono">${x.linkId}: ${x.msg.replaceAll('>=','⩾')}</div>`).join(''); } // renderAll // 
+
+// --- UIリアクティブ設定 --- // 設定変更で再描画する入力群を登録 
+[maxMInput,showGridChk,colorByPhaseChk,warnTightChk].forEach(el=>el.addEventListener('input',renderAll)); // オプション変更時 // 
+
+// --- 初期描画 --- // 初回描画呼び出し 
+renderAll(); // 最初の描画実行 // 
+
+</script><!-- スクリプト終了 --> 
+</body><!-- ボディ終了 --> 
+</html><!-- ドキュメント終了 -->
