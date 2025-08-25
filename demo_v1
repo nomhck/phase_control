@@ -1,0 +1,704 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>EPC Relation & Phase Control — Neon Glass Mock</title>
+<style>
+  :root{
+    --bg: #070b14;            /* 深い群青 */
+    --bg-grad-1:#0b1220;
+    --bg-grad-2:#10172a;
+    --panel:#0c1220aa;        /* glass(半透明) */
+    --panel-border:#1f2a44;
+    --text:#e7edf7;
+    --muted:#94a3b8;
+    --accent:#7dd3fc;         /* シアン */
+    --accent-2:#a78bfa;       /* パープル */
+    --ok:#34d399;
+    --warn:#fbbf24;
+    --err:#f87171;
+    --grid:#1f2a44;
+    --glow-1:#60a5fa;
+    --glow-2:#a78bfa;
+    --card:#0b1021cf;
+    --shadow: 0 10px 28px rgba(0,0,0,0.35), 0 2px 12px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, Noto Sans JP, sans-serif;}
+  body{
+    margin:0; color:var(--text);
+    background:
+      radial-gradient(1200px 800px at 20% -10%, rgba(124,58,237,0.20), transparent 60%),
+      radial-gradient(1000px 700px at 110% 10%, rgba(59,130,246,0.18), transparent 60%),
+      linear-gradient(180deg, var(--bg-grad-1), var(--bg-grad-2));
+    animation:bgfloat 26s linear infinite alternate;
+  }
+  @keyframes bgfloat{
+    from{background-position: 0 0, 0 0, 0 0;}
+    to{background-position: 0 -40px, -30px 20px, 0 0;}
+  }
+  header{
+    padding:14px 18px; border-bottom:1px solid #12203a; display:flex; align-items:center; gap:14px;
+    backdrop-filter: blur(6px);
+  }
+  header h1{margin:0; font-size:16px; letter-spacing:.4px; font-weight:800;
+    background: linear-gradient(90deg, #93c5fd, #c084fc 50%, #a7f3d0);
+    -webkit-background-clip:text; background-clip:text; color: transparent;
+    text-shadow: 0 0 24px rgba(120,119,198,0.25);
+  }
+  .pill{font-size:12px;color:#cbd5e1;background:#0b1021cc;border:1px solid #1f2a44;padding:2px 10px;border-radius:999px}
+  .container{display:grid;grid-template-columns:420px 1fr;gap:14px;padding:14px}
+  .panel{
+    background: var(--panel); border:1px solid var(--panel-border); border-radius:14px; padding:12px;
+    box-shadow: var(--shadow); backdrop-filter: blur(12px);
+  }
+  .panel h2{margin:0 0 10px; font-size:13px; color:var(--muted); font-weight:700; letter-spacing:.3px}
+  .kpi-table{width:100%; border-collapse: collapse; font-size:12px;}
+  .kpi-table th,.kpi-table td{border-bottom:1px solid #16233e; padding:8px 6px; text-align:left;}
+  .kpi-table th{color:#9fb3ce; font-weight:700;}
+  .kpi-table tr:hover{background:#0b1327;}
+  .kpi-table input[type="number"], .kpi-table select{
+    width:100%; background:#0b1021; color:var(--text); border:1px solid #1e2b4b; border-radius:8px; padding:6px 8px;
+    outline:none; transition: border-color .2s, box-shadow .2s;
+  }
+  .kpi-table input[type="number"]:focus{border-color:#2b6cb0; box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+  .tag{font-size:11px; color:#e2e8f0; background:linear-gradient(120deg,#0b1224,#0f1a33); border:1px solid #243457; padding:2px 8px; border-radius:999px}
+  .flex{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .small{font-size:12px;color:var(--muted)}
+  .btn{
+    background: linear-gradient(180deg,#0e1630,#0c152b);
+    border:1px solid #22335c; color:#e5edff; padding:8px 10px; border-radius:10px; cursor:pointer;
+    transition: transform .06s ease, border-color .2s, box-shadow .2s;
+  }
+  .btn:hover{border-color:#395b9e; box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+  .btn:active{transform: translateY(1px) scale(.99)}
+  .status-ok{color:var(--ok)} .status-warn{color:var(--warn)} .status-err{color:var(--err)}
+  .pill-num{padding:2px 6px; border-radius:8px; background:#0b1021; border:1px solid #21325a; font-size:11px; color:#cbd5e1}
+  .list{max-height:170px; overflow:auto; padding-right:4px}
+  .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px}
+
+  /* Canvas */
+  #pcCanvas, #graphCanvas{
+    width:100%; height:380px; border:1px solid #16233e; border-radius:12px; background:linear-gradient(180deg,#0a1020,#0a0f1e);
+    box-shadow: inset 0 0 24px rgba(0,0,0,.45);
+  }
+  svg text{fill:#e6eefc; font-size:11px}
+  .gridline{stroke:#132140; stroke-width:1}
+  .gridline-strong{stroke:#20345e; stroke-width:1.2}
+  .axis{stroke:#2a4a86; stroke-width:1.4}
+  .node{fill:url(#nodeGrad); stroke:#2a4270; stroke-width:1}
+  .node.rect{rx:10; ry:10}
+  .node.phase-1{fill:url(#nodeGradP1)}
+  .node.phase-2{fill:url(#nodeGradP2)}
+  .node.phase-3{fill:url(#nodeGradP3)}
+  .node.phase-4{fill:url(#nodeGradP4)}
+  .edge{stroke:url(#edgeGrad); stroke-width:1.8; fill:none; filter:url(#glowEdge)}
+  .edge.err{stroke:#f87171; filter:url(#glowRed)}
+  .edge.warn{stroke:#fbbf24; filter:url(#glowAmber)}
+  .milestone{fill:url(#msGrad); filter:url(#glowCyan)}
+  .milestone.warn{fill:#fbbf24; filter:url(#glowAmber)}
+  .milestone.err{fill:#f87171; filter:url(#glowRed)}
+  .diamond{fill:#c084fc; transform-origin:center; filter:url(#glowPurple)}
+  .pulse{animation:pulse 2.2s ease-in-out infinite}
+  @keyframes pulse {
+    0%{transform: scale(1);}
+    50%{transform: scale(1.12);}
+    100%{transform: scale(1);}
+  }
+
+  /* Tooltip */
+  .tooltip{
+    position: fixed; pointer-events:none; z-index:1000; transform: translate(-50%,-120%);
+    background: var(--card); border:1px solid #22335c; color:#e6eefc; padding:8px 10px; border-radius:10px;
+    box-shadow: var(--shadow);
+    opacity:0; transition: opacity .12s ease, transform .12s ease;
+  }
+  .tooltip.show{opacity:1; transform: translate(-50%,-140%)}
+  .tooltip h4{margin:0 0 4px; font-size:12px; color:#c7d2fe}
+  .tooltip .row{font-size:11px; color:#cbd5e1}
+</style>
+</head>
+<body>
+<header>
+  <h1>EPC｜IN-OUT Relation → Phase Control（M） Mock — Neon Glass</h1>
+  <span class="pill">ネオングラデ & グロー & ガラス</span>
+  <span class="pill">FS/SS/FF/SF ＋ Lag（M小数/負値）</span>
+  <span class="pill">ドラッグ / ツールチップ / PNG出力</span>
+</header>
+
+<div class="container">
+  <!-- LEFT -->
+  <div class="panel">
+    <h2>KPI Milestone Summary（中央値＝Target M / 実績＝Actual M）</h2>
+    <table class="kpi-table" id="kpiTable">
+      <thead>
+        <tr>
+          <th style="width:26px;">ID</th>
+          <th>Milestone</th>
+          <th>Phase</th>
+          <th style="width:104px;">Target M</th>
+          <th style="width:104px;">Actual M</th>
+          <th style="width:84px;">Status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div style="height:12px;"></div>
+    <div class="grid2">
+      <div>
+        <h2>Links（依存関係）</h2>
+        <div class="flex">
+          <select id="predSel"></select>
+          <select id="succSel"></select>
+        </div>
+        <div class="flex">
+          <select id="typeSel"><option>FS</option><option>SS</option><option>FF</option><option>SF</option></select>
+          <input id="lagInput" type="number" step="0.1" value="0" />
+          <span class="small">Lag（M）：負で前倒し</span>
+        </div>
+        <div class="flex">
+          <button class="btn" id="addLinkBtn">＋ リンク追加</button>
+          <button class="btn" id="toggleViolBtn">違反のみ表示/解除</button>
+        </div>
+        <div class="list" id="linksList" style="margin-top:6px;"></div>
+      </div>
+      <div>
+        <h2>表示 & 出力</h2>
+        <div class="small">M軸最大</div>
+        <input type="number" id="maxM" value="12" min="3" max="60" step="1" />
+        <div class="small" style="margin-top:8px;">オプション</div>
+        <div class="flex">
+          <label><input type="checkbox" id="showGrid" checked /> グリッド</label>
+          <label><input type="checkbox" id="colorByPhase" checked /> フェーズ色</label>
+          <label><input type="checkbox" id="warnTight" /> 余裕ゼロ警告</label>
+        </div>
+        <div class="small" style="margin-top:8px;">エクスポート</div>
+        <div class="flex">
+          <button class="btn" id="exportJsonBtn">JSON出力</button>
+          <button class="btn" id="exportPngBtn">PC図PNG</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel">
+    <h2>PC図（M軸）｜ターゲット/実績・制約と連動</h2>
+    <svg id="pcCanvas"></svg>
+    <div style="height:12px;"></div>
+    <h2>IN-OUT Relation（Phaseレーン配置＋ドラッグ可）</h2>
+    <svg id="graphCanvas"></svg>
+    <div style="height:12px;"></div>
+    <h2>制約チェック（Mの不等式）</h2>
+    <div id="violations" class="small"></div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+/* -------------------------
+ * 初期データ
+ * ------------------------- */
+const phases = [
+  { id: 1, name: "FEED" },
+  { id: 2, name: "Design" },
+  { id: 3, name: "Procurement" },
+  { id: 4, name: "Construction" },
+  { id: 5, name: "Commissioning" },
+];
+
+let items = [
+  { id: "ENG-001", name: "Basic Engineering Complete", phase: 1, targetM: 1.0, actualM: null, status: "Planned" },
+  { id: "ENG-005", name: "P&ID Approved (IFC)",        phase: 2, targetM: 2.2, actualM: null, status: "Planned" },
+  { id: "PROC-010", name: "Procurement Kickoff",        phase: 3, targetM: 2.0, actualM: null, status: "Planned" },
+  { id: "PROC-030", name: "Vendor Data Complete",       phase: 3, targetM: 3.5, actualM: null, status: "Planned" },
+  { id: "CONST-010", name: "Site Mobilization",         phase: 4, targetM: 5.0, actualM: null, status: "Planned" },
+  { id: "COMM-001", name: "Commissioning Start",        phase: 5, targetM: 9.0, actualM: null, status: "Planned" }
+];
+
+let links = [
+  { id: "L1", pred: "ENG-001",  succ: "PROC-010",  type: "FS", lagM: 0.0 },
+  { id: "L2", pred: "ENG-005",  succ: "PROC-030",  type: "FS", lagM: -0.3 },
+  { id: "L3", pred: "PROC-030", succ: "CONST-010", type: "FS", lagM: 0.0 },
+  { id: "L4", pred: "CONST-010",succ: "COMM-001",  type: "FS", lagM: 0.0 }
+];
+
+/* -------------------------
+ * 要素取得
+ * ------------------------- */
+const kpiBody = document.querySelector('#kpiTable tbody');
+const predSel  = document.querySelector('#predSel');
+const succSel  = document.querySelector('#succSel');
+const typeSel  = document.querySelector('#typeSel');
+const lagInput = document.querySelector('#lagInput');
+const addLinkBtn    = document.querySelector('#addLinkBtn');
+const toggleViolBtn = document.querySelector('#toggleViolBtn');
+const linksList = document.querySelector('#linksList');
+const maxMInput = document.querySelector('#maxM');
+const showGridChk = document.querySelector('#showGrid');
+const colorByPhaseChk = document.querySelector('#colorByPhase');
+const warnTightChk = document.querySelector('#warnTight');
+const pcSvg = document.querySelector('#pcCanvas');
+const graphSvg = document.querySelector('#graphCanvas');
+const violationsDiv = document.querySelector('#violations');
+const exportJsonBtn = document.querySelector('#exportJsonBtn');
+const exportPngBtn  = document.querySelector('#exportPngBtn');
+const tooltip = document.querySelector('#tooltip');
+
+let violOnly = false;
+
+/* -------------------------
+ * KPI TABLE
+ * ------------------------- */
+function renderKpiTable(){
+  kpiBody.innerHTML = '';
+  const phaseOrder = new Map(phases.map((p,i)=>[p.id,i]));
+  const sorted = [...items].sort((a,b)=> phaseOrder.get(a.phase)-phaseOrder.get(b.phase) || (a.targetM - b.targetM));
+  for(const it of sorted){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="mono">${it.id}</td>
+      <td>${it.name}</td>
+      <td><span class="tag">${phaseName(it.phase)}</span></td>
+      <td><input type="number" step="0.1" value="${it.targetM ?? ''}" data-id="${it.id}" data-field="targetM" /></td>
+      <td><input type="number" step="0.1" value="${it.actualM ?? ''}" data-id="${it.id}" data-field="actualM" /></td>
+      <td>${statusBadge(it)}</td>
+    `;
+    kpiBody.appendChild(tr);
+  }
+  kpiBody.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const id = e.target.dataset.id;
+      const field = e.target.dataset.field;
+      const v = e.target.value === '' ? null : parseFloat(e.target.value);
+      const obj = items.find(x=>x.id===id);
+      obj[field] = (v===null || Number.isNaN(v)) ? null : v;
+      if (obj.actualM != null && obj.targetM != null) obj.status = (obj.actualM <= obj.targetM) ? 'Done' : 'Delayed';
+      renderAll();
+    });
+  });
+}
+
+function statusBadge(it){
+  if (it.actualM==null) return `<span class="small">Planned</span>`;
+  const cls = (it.actualM <= it.targetM) ? 'status-ok' : 'status-warn';
+  const txt = (it.actualM <= it.targetM) ? 'On / Early' : 'Delayed';
+  return `<span class="${cls}">${txt}</span>`;
+}
+function phaseName(id){ return phases.find(p=>p.id===id)?.name ?? `P${id}`; }
+
+/* -------------------------
+ * Links編集
+ * ------------------------- */
+function renderLinkSelectors(){
+  const opts = items.map(it=>`<option value="${it.id}">${it.id} ${it.name}</option>`).join('');
+  predSel.innerHTML = opts; succSel.innerHTML = opts;
+}
+function renderLinksList(violOnly=false){
+  linksList.innerHTML = '';
+  const vmap = new Map(checkConstraints().map(v=>[v.linkId, v]));
+  for(const lk of links){
+    const vio = vmap.get(lk.id);
+    if (violOnly && !vio) continue;
+    const line = document.createElement('div');
+    line.className = 'flex';
+    const txt = document.createElement('div');
+    txt.className = 'mono';
+    txt.textContent = `${lk.id}: ${lk.pred} -${lk.type}(${fmt(lk.lagM)}M)-> ${lk.succ}`;
+    const del = document.createElement('button');
+    del.className = 'btn';
+    del.textContent = '削除';
+    del.onclick = ()=>{ links = links.filter(x=>x.id!==lk.id); renderAll(); };
+    if (vio){
+      const badge = document.createElement('span');
+      badge.className = 'pill-num';
+      badge.style.borderColor = vio.severity==='err' ? '#f87171' : '#fbbf24';
+      badge.style.color      = vio.severity==='err' ? '#fca5a5' : '#fde68a';
+      badge.textContent = vio.msg.replaceAll('>=','⩾');
+      line.appendChild(badge);
+    }
+    line.appendChild(txt);
+    line.appendChild(del);
+    linksList.appendChild(line);
+  }
+}
+addLinkBtn.addEventListener('click', ()=>{
+  const pred = predSel.value, succ = succSel.value;
+  if (pred===succ){ alert('同一ノードは不可です'); return; }
+  const type = typeSel.value;
+  const lagM = parseFloat(lagInput.value) || 0;
+  const id = uniqueLinkId();
+  links.push({ id, pred, succ, type, lagM });
+  renderAll();
+});
+toggleViolBtn.addEventListener('click', ()=>{ violOnly = !violOnly; renderLinksList(violOnly); });
+
+/* -------------------------
+ * PC図
+ * ------------------------- */
+function renderPC(){
+  const width = pcSvg.clientWidth, height = pcSvg.clientHeight;
+  pcSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  pcSvg.innerHTML = '';
+
+  // defs: gradients & glows
+  const defs = createDefs();
+  pcSvg.appendChild(defs);
+
+  const maxM = Math.max(parseFloat(maxMInput.value)||12, getMaxMFromData());
+  const margin = {l: 56, r: 18, t: 20, b: 34};
+  const innerW = width - margin.l - margin.r;
+  const innerH = height - margin.t - margin.b;
+
+  const g = svgEl('g', { transform:`translate(${margin.l},${margin.t})` });
+  pcSvg.appendChild(g);
+
+  const scaleX = m => (m/maxM)*innerW;
+
+  // grid
+  if (showGridChk.checked){
+    for(let m=0; m<=maxM; m+=1){
+      const x = scaleX(m);
+      g.appendChild(svgEl('line', { x1:x, y1:0, x2:x, y2:innerH, class: m%1===0 ? 'gridline-strong' : 'gridline' }));
+      g.appendChild(svgText(m, x, innerH+18, 'middle', '', m%1===0 ? '#9fb3ce' : '#6b7fa3'));
+    }
+  }else{
+    g.appendChild(svgEl('line', { x1:0, y1:innerH, x2:innerW, y2:innerH, class:'axis' }));
+    for(let m=0; m<=maxM; m+=1){
+      const x = scaleX(m);
+      g.appendChild(svgText(m, x, innerH+18, 'middle'));
+    }
+  }
+  g.appendChild(svgText('M', innerW+12, innerH+18, 'start'));
+
+  // rows & milestones
+  const rowH = 26;
+  const sorted = [...items].sort((a,b)=> a.targetM - b.targetM);
+  const constraints = checkConstraints();
+  const violMap = new Map(constraints.map(c=>[c.nodeId ?? '', c]));
+  for (let i=0; i<sorted.length; i++){
+    const it = sorted[i];
+    const y = 12 + i*rowH;
+    const xT = scaleX(it.targetM || 0);
+
+    // baseline row guide
+    g.appendChild(svgEl('line', { x1:0, y1:y, x2:innerW, y2:y, stroke:'#0c1430', 'stroke-width':0.6 }));
+
+    // Target (circle)
+    const cls = classByNode(it);
+    const circle = svgEl('circle', { cx:xT, cy:y, r:6, class:`milestone ${cls} pulse` });
+    bindTip(circle, `<h4>${it.id} — Target</h4>
+      <div class="row">${it.name}</div>
+      <div class="row">Phase: ${phaseName(it.phase)}</div>
+      <div class="row">M: ${fmt(it.targetM??0)}</div>`);
+    g.appendChild(circle);
+
+    // label
+    g.appendChild(svgText(`${it.id}`, xT+10, y+4, 'start','mono'));
+
+    // Actual (diamond)
+    if (it.actualM != null){
+      const xA = scaleX(it.actualM);
+      const diamond = svgEl('rect', { x:xA-6, y:y-6, width:12, height:12, class:'diamond', transform:`rotate(45 ${xA} ${y})` });
+      bindTip(diamond, `<h4>${it.id} — Actual</h4>
+        <div class="row">${it.name}</div>
+        <div class="row">Actual M: ${fmt(it.actualM)}</div>
+        <div class="row">ΔM: ${it.targetM!=null?fmt(it.actualM - it.targetM):'–'}</div>`);
+      g.appendChild(diamond);
+    }
+  }
+  pcSvg._lastView = { maxM, margin, innerW, innerH };
+}
+function classByNode(it){
+  const vlist = checkConstraints();
+  const involvedErr = vlist.some(v=> v.severity==='err' && (v.pred===it.id || v.succ===it.id));
+  const involvedWarn = vlist.some(v=> v.severity==='warn' && (v.pred===it.id || v.succ===it.id));
+  if (involvedErr) return 'err';
+  if (involvedWarn) return 'warn';
+  return '';
+}
+
+/* -------------------------
+ * Relation Graph（ドラッグ可）
+ * ------------------------- */
+let nodePosOverride = new Map(); // id -> {x,y}
+function renderGraph(){
+  const width = graphSvg.clientWidth, height = graphSvg.clientHeight;
+  graphSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  graphSvg.innerHTML = '';
+
+  const defs = createDefs();
+  graphSvg.appendChild(defs);
+
+  const margin = {l: 18, r: 18, t: 26, b: 18};
+  const innerW = width - margin.l - margin.r;
+  const innerH = height - margin.t - margin.b;
+
+  const g = svgEl('g', { transform:`translate(${0},${0})` });
+  graphSvg.appendChild(g);
+
+  // phase lanes
+  const cols = phases.length;
+  const colW = innerW / cols;
+  const colX = (c)=> margin.l + (c+0.5)*colW;
+
+  // calc positions
+  const byPhase = new Map(phases.map(p=>[p.id, []]));
+  for(const it of items) byPhase.get(it.phase)?.push(it);
+  for(const [pid, arr] of byPhase) arr.sort((a,b)=> a.targetM - b.targetM);
+
+  const nodePos = new Map();
+  for (let c=0; c<phases.length; c++){
+    const pid = phases[c].id;
+    const arr = byPhase.get(pid) || [];
+    const rows = arr.length;
+    for (let r=0; r<rows; r++){
+      const it = arr[r];
+      const defX = colX(c);
+      const defY = margin.t + (r+1)*((innerH-30)/(rows+1));
+      const ov = nodePosOverride.get(it.id);
+      nodePos.set(it.id, ov ? {x:ov.x, y:ov.y} : {x:defX, y:defY});
+    }
+    // phase title
+    g.appendChild(svgText(phases[c].name, colX(c), 16, 'middle', '', '#9fb3ce'));
+  }
+
+  // edges (curved)
+  const viols = checkConstraints();
+  const vMap = new Map(viols.map(v=>[v.linkId, v]));
+  for(const lk of links){
+    const p = nodePos.get(lk.pred), s = nodePos.get(lk.succ);
+    if (!p || !s) continue;
+    const midX = (p.x + s.x)/2;
+    const curve = `M ${p.x} ${p.y} C ${midX} ${p.y}, ${midX} ${s.y}, ${s.x} ${s.y}`;
+    const cls = vMap.get(lk.id)?.severity ?? '';
+    const path = svgEl('path', { d:curve, class:`edge ${cls}` });
+    bindTip(path, `<h4>${lk.pred} → ${lk.succ}</h4>
+      <div class="row">Type: ${lk.type}</div>
+      <div class="row">Lag: ${fmt(lk.lagM)} M</div>
+      ${vMap.get(lk.id) ? `<div class="row" style="color:#fca5a5">Violation: ${vMap.get(lk.id).msg.replaceAll('>=','⩾')}</div>`:''}
+    `);
+    graphSvg.appendChild(path);
+
+    // edge label
+    const mx = midX, my = (p.y + s.y)/2 - 6;
+    const label = svgText(`${lk.type} ${fmt(lk.lagM)}M`, mx, my, 'middle', 'mono');
+    graphSvg.appendChild(label);
+  }
+
+  // nodes (draggable)
+  for(const it of items){
+    const pos = nodePos.get(it.id); if (!pos) continue;
+    const pIndex = phases.findIndex(p=>p.id===it.phase);
+    const colorClass = colorByPhaseChk.checked ? `phase-${(pIndex%4)+1}` : '';
+    const grp = svgEl('g', { cursor:'grab' });
+
+    const rect = svgEl('rect', { x:pos.x-110, y:pos.y-16, width:220, height:34, class:`node rect ${colorClass}` });
+    rect.setAttribute('filter', 'url(#glowSoft)');
+    const idT  = svgText(`${it.id}`, pos.x-102, pos.y+4, 'start','mono','#cbd5e1');
+    const name = svgText(it.name, pos.x-12, pos.y+4, 'start','', '#e6eefc');
+
+    bindTip(rect, `<h4>${it.id}</h4>
+      <div class="row">${it.name}</div>
+      <div class="row">Phase: ${phaseName(it.phase)}</div>
+      <div class="row">Target M: ${fmt(it.targetM??0)}${it.actualM!=null?` / Actual: ${fmt(it.actualM)}`:''}</div>`);
+
+    grp.appendChild(rect); grp.appendChild(idT); grp.appendChild(name);
+    graphSvg.appendChild(grp);
+
+    // drag
+    enableDrag(grp, it.id, pos);
+  }
+}
+
+function enableDrag(grp, id, pos){
+  let dragging=false, offset=null;
+  grp.addEventListener('mousedown', (e)=>{
+    dragging=true; grp.style.cursor='grabbing';
+    const pt = svgPoint(graphSvg, e.clientX, e.clientY);
+    offset = { dx: pos.x - pt.x, dy: pos.y - pt.y };
+  });
+  window.addEventListener('mousemove', (e)=>{
+    if (!dragging) return;
+    const pt = svgPoint(graphSvg, e.clientX, e.clientY);
+    const nx = pt.x + offset.dx, ny = pt.y + offset.dy;
+    nodePosOverride.set(id, {x:nx, y:ny});
+    renderGraph(); // 簡易：再描画（十分軽い）
+  });
+  window.addEventListener('mouseup', ()=>{
+    if (dragging){ dragging=false; grp.style.cursor='grab'; }
+  });
+}
+
+function svgPoint(svg, x, y){
+  const pt = svg.createSVGPoint(); pt.x = x; pt.y = y;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+/* -------------------------
+ * 制約チェック（不等式）
+ * ------------------------- */
+function checkConstraints(){
+  const idx = new Map(items.map(it=>[it.id, it]));
+  const res=[];
+  for(const lk of links){
+    const P = idx.get(lk.pred), S = idx.get(lk.succ);
+    if (!P || !S || P.targetM==null || S.targetM==null) continue;
+    const lag = lk.lagM || 0;
+    let ok=true, diff=0, msg='';
+    if (lk.type==='FS' || lk.type==='SS' || lk.type==='FF'){
+      diff = S.targetM - (P.targetM + lag);
+      ok = diff >= -1e-9; msg = `M(${S.id}) >= M(${P.id}) + ${fmt(lag)}`;
+    } else if (lk.type==='SF'){
+      diff = P.targetM - (S.targetM + lag);
+      ok = diff >= -1e-9; msg = `M(${P.id}) >= M(${S.id}) + ${fmt(lag)}`;
+    }
+    let severity = ok ? null : 'err';
+    if (!severity && warnTightChk.checked && Math.abs(diff) < 1e-9) severity = 'warn';
+    if (severity) res.push({ linkId: lk.id, pred: lk.pred, succ: lk.succ, msg, severity });
+  }
+  return res;
+}
+function getMaxMFromData(){
+  return Math.ceil(Math.max( ...(items.map(x=>x.targetM||0).concat(items.map(x=>x.actualM||0))) ));
+}
+function fmt(x){ return (Math.round(x*10)/10).toFixed(1); }
+function uniqueLinkId(){
+  let n=links.length+1; while(true){ const id=`L${n}`; if (!links.some(l=>l.id===id)) return id; n++; }
+}
+
+/* -------------------------
+ * 共通SVGユーティリティ / defs
+ * ------------------------- */
+function svgEl(tag, attrs){ const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,v); return e; }
+function svgText(str, x,y, anchor='start', cls='', fill){
+  const t = svgEl('text', { x, y, 'text-anchor':anchor }); if (cls) t.setAttribute('class', cls); if (fill) t.setAttribute('fill', fill);
+  t.textContent = str; return t;
+}
+function createDefs(){
+  const defs = svgEl('defs',{});
+  // gradients
+  const nodeGrad = svgEl('linearGradient', { id:'nodeGrad', x1:'0%',y1:'0%',x2:'100%',y2:'0%' });
+  nodeGrad.appendChild(svgEl('stop',{offset:'0%','stop-color':'#0f1b35'}));
+  nodeGrad.appendChild(svgEl('stop',{offset:'100%','stop-color':'#0a1326'}));
+  defs.appendChild(nodeGrad);
+
+  const makePhaseGrad = (id,c1,c2)=> {
+    const g = svgEl('linearGradient',{id, x1:'0%',y1:'0%',x2:'100%',y2:'0%'});
+    g.appendChild(svgEl('stop',{offset:'0%','stop-color':c1}));
+    g.appendChild(svgEl('stop',{offset:'100%','stop-color':c2}));
+    defs.appendChild(g);
+  };
+  makePhaseGrad('nodeGradP1','#0f253f','#0a162b');
+  makePhaseGrad('nodeGradP2','#0f2f29','#0a1c17');
+  makePhaseGrad('nodeGradP3','#2a1d35','#160f1e');
+  makePhaseGrad('nodeGradP4','#2b2414','#17120a');
+
+  const edgeGrad = svgEl('linearGradient',{id:'edgeGrad', x1:'0%',y1:'0%',x2:'100%',y2:'0%'});
+  edgeGrad.appendChild(svgEl('stop',{offset:'0%','stop-color':'#60a5fa'}));
+  edgeGrad.appendChild(svgEl('stop',{offset:'100%','stop-color':'#a78bfa'}));
+  defs.appendChild(edgeGrad);
+
+  const msGrad = svgEl('radialGradient',{id:'msGrad', cx:'50%', cy:'50%', r:'60%'});
+  msGrad.appendChild(svgEl('stop',{offset:'0%','stop-color':'#93c5fd'}));
+  msGrad.appendChild(svgEl('stop',{offset:'100%','stop-color':'#38bdf8'}));
+  defs.appendChild(msGrad);
+
+  // glows
+  const glow = (id, color, blur=6) => {
+    const f = svgEl('filter',{id, x:'-50%',y:'-50%',width:'200%',height:'200%'});
+    f.appendChild(svgEl('feGaussianBlur',{stdDeviation:blur, result:'coloredBlur'}));
+    const feMerge = svgEl('feMerge',{});
+    feMerge.appendChild(svgEl('feMergeNode',{in:'coloredBlur'}));
+    feMerge.appendChild(svgEl('feMergeNode',{in:'SourceGraphic'}));
+    f.appendChild(svgEl('feFlood',{ 'flood-color': color, 'flood-opacity':'0.55', result:'flood'}));
+    f.appendChild(svgEl('feComposite',{in:'flood', in2:'coloredBlur', operator:'in', result:'glow'}));
+    const feMerge2 = svgEl('feMerge',{});
+    feMerge2.appendChild(svgEl('feMergeNode',{in:'glow'}));
+    feMerge2.appendChild(svgEl('feMergeNode',{in:'SourceGraphic'}));
+    f.appendChild(feMerge2);
+    return f;
+  };
+  defs.appendChild(glow('glowCyan','#38bdf8',5));
+  defs.appendChild(glow('glowPurple','#a78bfa',5));
+  defs.appendChild(glow('glowRed','#f87171',5));
+  defs.appendChild(glow('glowAmber','#fbbf24',5));
+  defs.appendChild(glow('glowEdge','#7aa2ff',3));
+  defs.appendChild(glow('glowSoft','#4b5563',2));
+  return defs;
+}
+
+/* -------------------------
+ * Tooltip
+ * ------------------------- */
+function bindTip(el, html){
+  el.addEventListener('mousemove', (e)=> {
+    tooltip.innerHTML = html;
+    tooltip.style.left = `${e.clientX}px`;
+    tooltip.style.top = `${e.clientY}px`;
+    if (!tooltip.classList.contains('show')) tooltip.classList.add('show');
+  });
+  el.addEventListener('mouseleave', ()=> tooltip.classList.remove('show'));
+}
+
+/* -------------------------
+ * PNG Export（PC図）
+ * ------------------------- */
+function exportSvgAsPng(svgElRef, filename='pc_chart.png'){
+  const xml = new XMLSerializer().serializeToString(svgElRef);
+  const img = new Image();
+  img.onload = function(){
+    const c = document.createElement('canvas');
+    c.width = svgElRef.clientWidth; c.height = svgElRef.clientHeight;
+    const ctx = c.getContext('2d');
+    // 背景
+    const grd = ctx.createLinearGradient(0,0,0,c.height);
+    grd.addColorStop(0, '#0a1020'); grd.addColorStop(1, '#0a0f1e');
+    ctx.fillStyle = grd; ctx.fillRect(0,0,c.width,c.height);
+    ctx.drawImage(img, 0, 0);
+    c.toBlob((blob)=>{
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+}
+
+/* -------------------------
+ * まとめて描画
+ * ------------------------- */
+function renderAll(){
+  renderKpiTable();
+  renderLinkSelectors();
+  renderLinksList(violOnly);
+  renderPC();
+  renderGraph();
+  const v = checkConstraints();
+  if (v.length===0){
+    violationsDiv.innerHTML = `<span class="status-ok">制約違反なし</span>`;
+  }else{
+    violationsDiv.innerHTML = v.map(x=>{
+      const c = x.severity==='err' ? 'status-err' : 'status-warn';
+      return `<div class="${c} mono">${x.linkId}: ${x.msg.replaceAll('>=','⩾')}</div>`;
+    }).join('');
+  }
+}
+[maxMInput, showGridChk, colorByPhaseChk, warnTightChk].forEach(el=> el.addEventListener('input', renderAll));
+exportJsonBtn.addEventListener('click', ()=>{
+  const payload = { phases, items, links, options:{ maxM: parseFloat(maxMInput.value)||12, warnTight: !!warnTightChk.checked }};
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'epc_mock_data.json'; a.click();
+  URL.revokeObjectURL(a.href);
+});
+exportPngBtn.addEventListener('click', ()=> exportSvgAsPng(pcSvg));
+
+/* 初期表示 */
+renderAll();
+</script>
+</body>
+</html>
